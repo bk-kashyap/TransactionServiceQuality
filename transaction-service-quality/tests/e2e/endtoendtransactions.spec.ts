@@ -1,72 +1,37 @@
-import { test, expect } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+import { test, expect } from '../../src/fixtures/api.fixture';
+import { operationTypes } from '../../src/data/test-data';
+import { environment } from '../../src/config/environment';
+import { oracle, persistedTransactions } from '../../src/assertions/oracle';
+import { validateContractResponse } from '../../src/validators/schema.validator';
 
-test('Create account and create transaction journey', async ({ request }) => {
-
-    // STEP 1
-    const accountResponse = await request.post('/accounts', {
-        data: {
-          document_number: '12345678900'
-        }
-     });
-
-    expect(accountResponse.status()).toBe(201);
-    const account = await accountResponse.json();
-    expect(account.account_id).toBeDefined();
-
-
-    // STEP 2
-    const transactionResponse = await request.post('/transactions', {
-        data: {
-          account_id: account.account_id,
-          amount: 50,
-          operation_type_id: 1
-        }
-     });
-
-    expect(transactionResponse.status()).toBe(201);
-    const transaction = await transactionResponse.json();
-    expect(transaction.account_id).toBe(account.account_id);
-
-
-    // STEP 3
-    const getAccountResponse = await request.get(`/accounts/${account.account_id}`);
-    expect(getAccountResponse.status()).toBe(200);
-    const retrievedAccount = await getAccountResponse.json();
-    expect(retrievedAccount.account_id).toBe(account.account_id);
+test('T3-JOURNEY account and all operation types @behavior @pr @release', async ({ request, account, accounts, transactions }, info) => {
+  oracle(info, 'T3-JOURNEY', 'HEARSAY', 'R-02/R-03/R-04/R-05', 'Journey loses account association, operation semantics, or resulting records');
+  const ids: number[] = [];
+  for (const operation of operationTypes) {
+    await test.step(`${operation.name}: post and verify resulting record`, async () => {
+      const key = randomUUID();
+      const response = await transactions.createTransaction(account.account_id, 10.99, operation.id, key);
+      expect(response.status()).toBe(201);
+      const body = await validateContractResponse('POST', '/transactions', response);
+      expect(body.account_id).toBe(account.account_id);
+      expect(body.operation_type_id).toBe(operation.id);
+      expect(body.amount).toBe(operation.sign * 10.99);
+      expect(body.type).toBe(operation.type);
+      expect(Number.isInteger(body.transaction_id)).toBe(true);
+      ids.push(body.transaction_id);
+      if (environment.transactionQueryPath) {
+        const observed = await persistedTransactions(request, account.account_id, key);
+        expect(observed.count).toBe(1);
+        expect(observed.transactions[0]).toMatchObject(body);
+      } else {
+        info.annotations.push({ type: 'blocked-observation', description: 'No transaction read/count contract: response-only journey cannot establish persisted state' });
+        if (process.env.RELEASE_GATE === '1') throw new Error('Release state verification BLOCKED: missing TRANSACTION_QUERY_PATH');
+      }
+    });
   }
-);
-
-/**
- * High Priority Quality Gates
- * Missing Idempotency Id or Key in the request header
- * 
- * 1. Create a transaction with a unique idempotency key and verify that the transaction is 
- * created successfully.
- * 2. Create a transaction with the same idempotency key and verify that the transaction is not 
- * created again, but the response is the same as the first request.
- * 3. Create a transaction with a different idempotency key and verify that the transaction is 
- * created successfully.
- * 4. Create a transaction with a missing idempotency key and verify that the transaction is 
- * created successfully.
- * 5. Also, a tranactionId is returned in the response, which can be used to verify that the 
- * transaction is created successfully.
- * 6. Or a X-corelation-id is returned in the response, which can be used to verify that the transaction flow.
- * 
- * Contract Quality Gates :
- *                     CI
-                     │
-          ┌──────────┼───────────┐
-          ▼          ▼           ▼
-     Contract     API Tests    Journey
-     Validation
-          │          │           │
-          └──────────┼───────────┘
-                     ▼
-                Quality Gate
-                     │
-              ┌──────┴──────┐
-              ▼             ▼
-             PASS           FAIL
-              │             │
-           Deploy       Stop Pipeline
- */
+  expect(new Set(ids).size).toBe(4);
+  const retrieved = await accounts.getAccount(account.account_id);
+  expect(retrieved.status()).toBe(200);
+  expect(await validateContractResponse('GET', '/accounts/{accountId}', retrieved)).toMatchObject(account);
+});

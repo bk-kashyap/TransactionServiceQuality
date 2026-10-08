@@ -1,13 +1,26 @@
 {
   "name": "transaction-service-quality",
   "version": "1.0.0",
-  "description": "",
+  "description": "Contract-first API assignment harness; mock results are not service correctness evidence",
   "main": "index.js",
   "directories": {
     "doc": "docs",
     "test": "tests"
   },
-  "scripts": {},
+  "scripts": {
+    "test": "node scripts/run.cjs all",
+    "test:pr": "node scripts/run.cjs pr",
+    "test:nightly": "node scripts/run.cjs nightly",
+    "test:prism": "node scripts/run.cjs prism",
+    "test:release": "node scripts/run.cjs release",
+    "contract:validate": "node scripts/validate-contract.cjs",
+    "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
+    "mock": "node scripts/mock-server.cjs",
+    "perf:smoke": "node scripts/perf-smoke.cjs",
+    "perf:k6": "k6 run performance/k6/transactions.js",
+    "report": "node node_modules/@playwright/test/cli.js show-report",
+    "traceability": "node scripts/traceability.cjs"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",

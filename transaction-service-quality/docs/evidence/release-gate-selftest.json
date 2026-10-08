@@ -1,0 +1,13 @@
+{
+  "meaning": "Release-gate evaluator self-test using localhost synthetic mock as target, NOT real staging evidence",
+  "stats": {
+    "startTime": "2026-10-08T05:32:27.544Z",
+    "duration": 1685.013,
+    "expected": 2,
+    "skipped": 3,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "expectedExitCode": 1,
+  "observedExitCode": 1
+}

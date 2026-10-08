@@ -1,0 +1,93 @@
+name: API quality gates
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Run the staging release gate (requires agreed policy and query adapter)
+        type: boolean
+        default: false
+defaults:
+  run:
+    working-directory: transaction-service-quality
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: transaction-service-quality/package-lock.json
+      - run: npm ci
+      - run: npm run contract:validate
+      - run: npm run typecheck
+      - run: npm run test:prism
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contract-report
+          path: |
+            transaction-service-quality/playwright-report/
+            transaction-service-quality/test-results/
+  functional:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: contract
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: transaction-service-quality/package-lock.json
+      - run: npm ci
+      - name: PR risk suite or scheduled full suite
+        run: |
+          if [ '${{ github.event_name }}' = 'schedule' ]; then
+            npm test
+          else
+            npm run test:pr
+          fi
+      - run: npm run perf:smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-report
+          path: |
+            transaction-service-quality/playwright-report/
+            transaction-service-quality/test-results/
+  release:
+    if: github.event_name == 'workflow_dispatch' && inputs.release
+    needs: functional
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    env:
+      BASE_URL: ${{ vars.STAGING_BASE_URL }}
+      API_TOKEN: ${{ secrets.STAGING_API_TOKEN }}
+      APPROVED_POLICY: ${{ vars.APPROVED_POLICY }}
+      TRANSACTION_QUERY_PATH: ${{ vars.TRANSACTION_QUERY_PATH }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+      - run: npm run test:release
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-evidence
+          path: |
+            transaction-service-quality/playwright-report/
+            transaction-service-quality/test-results/

@@ -1,5 +1,19 @@
 # AI Use and Engineering Judgment
 
+## Correction-session update (8 October 2026)
+
+Codex corrected the API suite and payload/assertion defects, implemented YAML-derived validation, isolated fixtures, configurable environments, incident count verification, reference mock, performance scripts, CI gates and traceability. The original Swagger was preserved. Changes were prepared in a temporary working copy because the original project is outside the session's writable scope.
+
+One misleading approach caught during correction was treating a single returned transaction ID as proof of exactly one persisted posting. The incident test now checks an independently read count and keeps the original API's missing observation explicit. Another concrete defect caught by type checking was the reporter's synchronous onEnd result: it was changed to the asynchronous signature required by the installed Playwright types.
+
+The implementation deliberately rejected silently adding mandatory properties or money constraints to local contract schemas. Instead it reads the supplied YAML and labels extra behavior as qa-reference-v1 assumptions. It also rejects dropping failed concurrent responses from the guardrail; GUARD-ERROR demonstrates why one success plus nineteen failures must not pass.
+
+Observed corrected results and remaining runtime limitations are recorded in docs/VERIFICATION.md. No real-provider, ledger or production performance result is claimed. Historical author effort still needs actual records.
+
+## Historical review snapshot (before corrections below)
+
+The following text describes the earlier repository state. Its defects and missing files are historical findings, not the corrected working copy's current status.
+
 ## Scope and attribution
 
 This note records the AI-assisted repository review performed with OpenAI Codex on 8 October 2026. It distinguishes verified repository facts from proposed improvements and unsupported expectations. Earlier AI conversations were not available to this review, so this note does not attribute every existing test or strategy document to AI, or claim that earlier decisions were made when there is no evidence of them.
